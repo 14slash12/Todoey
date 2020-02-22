@@ -9,6 +9,7 @@
 import UIKit
 //import CoreData
 import RealmSwift
+import SwipeCellKit
 
 class TodoListViewController: UITableViewController {
 
@@ -38,7 +39,9 @@ class TodoListViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
+        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath) as! SwipeTableViewCell
+        
+        cell.delegate = self
         
         if let item = todoItems?[indexPath.row] {
             cell.textLabel?.text = item.title
@@ -212,3 +215,56 @@ extension TodoListViewController: UISearchBarDelegate {
     }
 }
 
+//MARK: - SwipeCell Delegate Methods
+
+extension TodoListViewController: SwipeTableViewCellDelegate {
+
+    func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath, for orientation: SwipeActionsOrientation) -> [SwipeAction]? {
+        
+        guard orientation == .right else { return nil }
+
+        var options = SwipeTableOptions()
+        options.expansionStyle = .destructiveAfterFill
+        
+        let deleteAction = SwipeAction(style: .destructive, title: "Delete") { action, indexPath in
+            // handle action by updating model with deletion
+            
+            if let item = self.todoItems?[indexPath.row] {
+                do {
+                    try self.realm.write {
+                        
+                        ///Delete from Realm-Database
+                        self.realm.delete(item)
+                    }
+                } catch {
+                    print("Error saving done status, \(error)")
+                }
+                
+            }
+            
+            // As we added the added the function tableView(_:, editActionsOptionsForRowAt:, for:) the gesture was added to delete tableViewCells with one complete slide from the right to the left.
+            // If we reload the Data from the tableView an SIGBART-Error will occur due to following scenario:
+            // 1. We swipe completly from right to left.
+            // 2. The item get's deleted from the Realm-Database due to the call of THIS closure we are in right now (i.e. This SwipeActions closure get's triggered)
+            // 3. We reload the the tableView -> The item dissappears from the tableView, because it is no longer in the Realm Database
+            // 4. The tableView(_:, editActionsOptionsForRowAt:, for:) wants to delete the item from the tableView -> but due to the tableView.reloadData() call this item no longer exists in this tableView.
+            // 5. The error occurs.
+            //tableView.reloadData()
+            
+        }
+
+        // customize the action appearance
+        deleteAction.image = UIImage(named: "delete")
+        
+        deleteAction.fulfill(with: .delete)
+
+        return [deleteAction]
+    }
+    
+    func tableView(_ tableView: UITableView, editActionsOptionsForRowAt indexPath: IndexPath, for orientation: SwipeActionsOrientation) -> SwipeOptions {
+        var options = SwipeOptions()
+        options.expansionStyle = .destructive
+        return options
+    }
+
+}
