@@ -9,9 +9,8 @@
 import UIKit
 //import CoreData
 import RealmSwift
-import SwipeCellKit
 
-class TodoListViewController: UITableViewController {
+class TodoListViewController: SwipeTableViewController {
 
     var todoItems: Results<Item>?
     let realm = try! Realm()
@@ -23,7 +22,7 @@ class TodoListViewController: UITableViewController {
         }
     }
     
-    //let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -39,9 +38,7 @@ class TodoListViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath) as! SwipeTableViewCell
-        
-        cell.delegate = self
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         if let item = todoItems?[indexPath.row] {
             cell.textLabel?.text = item.title
@@ -53,8 +50,6 @@ class TodoListViewController: UITableViewController {
         } else {
             cell.textLabel?.text = "No Items Added"
         }
-        
-        
         
         return cell
     }
@@ -79,15 +74,6 @@ class TodoListViewController: UITableViewController {
         
         tableView.reloadData()
         
-        
-//        Delete item when selected
-//        context.delete(itemArray[indexPath.row])
-//        itemArray.remove(at: indexPath.row)
-//
-//        todoItems[indexPath.row].done = !todoItems[indexPath.row].done
-//
-//        saveItems()
-        
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -101,14 +87,6 @@ class TodoListViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             //What will happen once the user clicks the Add Item Button in our UIAlert
-            
-//            let newItem = Item(context: self.context)
-//            newItem.title = textField.text!
-//            newItem.done = false
-//            newItem.parentCategory = self.selectedCategory
-//            self.itemArray.append(newItem)
-            
-            //self.saveItems()
             
             if let currentCategory = self.selectedCategory {
                 do {
@@ -143,43 +121,30 @@ class TodoListViewController: UITableViewController {
     
     
     //MARK: - Model Manipulation Methods
-
-    ///Save function only needed for CoreData
-//    func saveItems() {
-//        do {
-//            try context.save()
-//        } catch {
-//            print("Error saving items: \(error)")
-//        }
-//         
-//        tableView.reloadData()
-//    }
-    
-//    func loadItems(with request: NSFetchRequest<Item> = Item.fetchRequest(), predicate: NSPredicate? = nil) {
-//
-//        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
-//
-//        if let additionalPredicate = predicate {
-//            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, additionalPredicate])
-//        } else {
-//            request.predicate = categoryPredicate
-//        }
-//
-//
-//        do {
-//            itemArray = try context.fetch(request)
-//        } catch {
-//            print("Error fetching items from context: \(error)")
-//        }
-//
-//        tableView.reloadData()
-//    }
     
     func loadItems() {
 
         todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
 
         tableView.reloadData()
+    }
+    
+    //MARK: - Delete Data From Swipe
+    
+    override func updateModel(at indexPath: IndexPath) {
+        
+        if let selectedItem = self.todoItems?[indexPath.row] {
+            
+            do {
+                try realm.write {
+                    realm.delete(selectedItem)
+                }
+            } catch {
+                print("Error while deleting a category: \(error)")
+            }
+            
+            //tableView.reloadData() nicht notwendig, da die function tableView(_:, editActionsOptionsForRowAt:, for:) den tableView schon neu lädt. Führt sogar so zu einem Fehler in der App, wenn die obig erwähnte delegate-Function verwendet wird. Ohne die obig erwähnte delegate-Function ist hier jedoch tableView.reloadData() notwendig.
+        }
     }
 }
 
@@ -188,19 +153,9 @@ extension TodoListViewController: UISearchBarDelegate {
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         
-        
-        
         todoItems = todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: true)
         
         tableView.reloadData()
-        
-//        let request: NSFetchRequest<Item> = Item.fetchRequest()
-//
-//        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-//
-//        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-//
-//        loadItems(with: request)
     }
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
@@ -215,56 +170,3 @@ extension TodoListViewController: UISearchBarDelegate {
     }
 }
 
-//MARK: - SwipeCell Delegate Methods
-
-extension TodoListViewController: SwipeTableViewCellDelegate {
-
-    func tableView(_ tableView: UITableView, editActionsForRowAt indexPath: IndexPath, for orientation: SwipeActionsOrientation) -> [SwipeAction]? {
-        
-        guard orientation == .right else { return nil }
-
-        var options = SwipeTableOptions()
-        options.expansionStyle = .destructiveAfterFill
-        
-        let deleteAction = SwipeAction(style: .destructive, title: "Delete") { action, indexPath in
-            // handle action by updating model with deletion
-            
-            if let item = self.todoItems?[indexPath.row] {
-                do {
-                    try self.realm.write {
-                        
-                        ///Delete from Realm-Database
-                        self.realm.delete(item)
-                    }
-                } catch {
-                    print("Error saving done status, \(error)")
-                }
-                
-            }
-            
-            // As we added the added the function tableView(_:, editActionsOptionsForRowAt:, for:) the gesture was added to delete tableViewCells with one complete slide from the right to the left.
-            // If we reload the Data from the tableView an SIGBART-Error will occur due to following scenario:
-            // 1. We swipe completly from right to left.
-            // 2. The item get's deleted from the Realm-Database due to the call of THIS closure we are in right now (i.e. This SwipeActions closure get's triggered)
-            // 3. We reload the the tableView -> The item dissappears from the tableView, because it is no longer in the Realm Database
-            // 4. The tableView(_:, editActionsOptionsForRowAt:, for:) wants to delete the item from the tableView -> but due to the tableView.reloadData() call this item no longer exists in this tableView.
-            // 5. The error occurs.
-            //tableView.reloadData()
-            
-        }
-
-        // customize the action appearance
-        deleteAction.image = UIImage(named: "delete")
-        
-        deleteAction.fulfill(with: .delete)
-
-        return [deleteAction]
-    }
-    
-    func tableView(_ tableView: UITableView, editActionsOptionsForRowAt indexPath: IndexPath, for orientation: SwipeActionsOrientation) -> SwipeOptions {
-        var options = SwipeOptions()
-        options.expansionStyle = .destructive
-        return options
-    }
-
-}

@@ -10,15 +10,12 @@ import UIKit
 //import CoreData
 import RealmSwift
 
-class CategoryViewController: UITableViewController {
+class CategoryViewController: SwipeTableViewController {
     
     let realm = try! Realm()
     
-//    var categories = [Category]()
     var categories: Results<Category>?
     
-//    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -35,14 +32,13 @@ class CategoryViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        
+        // Bekommen eine Zelle aus der Super-Klasse durch aufrufen der tableView()-Funktion
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+            
         //cell.textLabel?.text = categories[indexPath.row].name
         cell.textLabel?.text = categories?[indexPath.row].name ?? "No Categories Added yet"
         
-        
         return cell
-        
     }
     
     //MARK: - TableView Delegate Methods
@@ -64,11 +60,6 @@ class CategoryViewController: UITableViewController {
     //MARK: - Data Manipulation Methods
     
     func save(category: Category) {
-//        do {
-//            try context.save()
-//        } catch {
-//            print("Error saving context: \(error)")
-//        }
         
         do {
             try realm.write {
@@ -88,16 +79,24 @@ class CategoryViewController: UITableViewController {
         tableView.reloadData()
     }
     
-//    func loadCategories(with request: NSFetchRequest<Category> = Category.fetchRequest()) {
-//
-//            do {
-//                categories = try context.fetch(request)
-//            } catch {
-//                print("Error fetching data from context: \(error)")
-//            }
-//
-//            tableView.reloadData()
-//        }
+    //MARK: - Delete Data From Swipe
+    
+    override func updateModel(at indexPath: IndexPath) {
+        
+        if let selectedCategory = self.categories?[indexPath.row] {
+            
+            do {
+                try realm.write {
+                    realm.delete(selectedCategory)
+                }
+            } catch {
+                print("Error while deleting a category: \(error)")
+            }
+            
+            //tableView.reloadData() nicht notwendig, da die function tableView(_:, editActionsOptionsForRowAt:, for:) den tableView schon neu lädt. Führt sogar so zu einem Fehler in der App, wenn die obig erwähnte delegate-Function verwendet wird. Ohne die obig erwähnte delegate-Function ist hier jedoch tableView.reloadData() notwendig.
+            
+        }
+    }
     
     //MARK: - Add New Categories
     
@@ -109,12 +108,9 @@ class CategoryViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add", style: .default) { (action) in
             
-            //let newCategory = Category(context: self.context)
             let newCategory = Category()
             
             newCategory.name = textField.text!
-            
-//            self.categories.append(newCategory)
             
             // Speichern neue Category als einzelnen Datenpunkt. Beim Laden werden alle Kategorien wieder in das categories-Array geladen.
             self.save(category: newCategory)
@@ -130,3 +126,4 @@ class CategoryViewController: UITableViewController {
         present(alert, animated: true, completion: nil)
     }
 }
+
