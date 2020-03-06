@@ -9,11 +9,14 @@
 import UIKit
 //import CoreData
 import RealmSwift
+import ChameleonFramework
 
 class TodoListViewController: SwipeTableViewController {
 
     var todoItems: Results<Item>?
     let realm = try! Realm()
+    
+    @IBOutlet weak var searchBar: UISearchBar!
     
     // Wissen allgemein nicht welche Kategorie es ist, da diese vom User selbst definiert wird. Deswegen macht es Sinn eine Optional-Variable zu verwenden (s. Fragezeichen hinter "Category").
     var selectedCategory: Category? {
@@ -28,6 +31,30 @@ class TodoListViewController: SwipeTableViewController {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
         
+        tableView.separatorStyle = .none
+        
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        // Der View ist in viewDidLoad() zwar schon geladen, aber noch nicht auf den Navigation-Stack (Stapel der views des NavigationControllers) hinzugefügt. In viewWillAppear() ist dies schon geladen.
+        
+        
+        if let colourHex = selectedCategory?.colour {
+            
+            guard let navBar = navigationController?.navigationBar else { fatalError("Navigation controller does not exist.")}
+            
+            
+            if let navBarColour = UIColor(hexString: colourHex) {
+                
+                navBar.barTintColor = navBarColour
+                
+                navBar.tintColor = ContrastColorOf(navBarColour, returnFlat: true)
+                
+                navBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: ContrastColorOf(navBarColour, returnFlat: true)]
+                    
+                searchBar.barTintColor = navBarColour
+            }
+        }
     }
     
     //MARK: - TableView Datasource Methods
@@ -42,6 +69,14 @@ class TodoListViewController: SwipeTableViewController {
         
         if let item = todoItems?[indexPath.row] {
             cell.textLabel?.text = item.title
+            
+            // Fragezeichen vor ".darken..." ist dazu da, zu checken, ob der Return-Value der HexColor()-Funktion nicht nil ist. Falls schon, wird gilt das if-Statement als false und wird übersprungen
+            if let colour =  HexColor(selectedCategory!.colour)?.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(todoItems!.count)) {
+                cell.backgroundColor = colour
+                cell.textLabel?.textColor = ContrastColorOf(colour, returnFlat: true)
+            }
+            
+            
             
             //Tenary operatoer ==>
             // value = condition ? valueIfTrue : valueIfFalse

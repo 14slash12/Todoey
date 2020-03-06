@@ -9,6 +9,7 @@
 import UIKit
 //import CoreData
 import RealmSwift
+import ChameleonFramework
 
 class CategoryViewController: SwipeTableViewController {
     
@@ -20,6 +21,22 @@ class CategoryViewController: SwipeTableViewController {
         super.viewDidLoad()
         
         loadCategories()
+        
+        tableView.separatorStyle = .none
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+//        let navBarAppearance = UINavigationBarAppearance()
+//        navBarAppearance.configureWithOpaqueBackground()
+//        navBarAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+//        navBarAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+//        navBarAppearance.backgroundColor = .red
+//        navigationController?.navigationBar.standardAppearance = navBarAppearance
+//        navigationController?.navigationBar.scrollEdgeAppearance = navBarAppearance
+        
+        guard let navBar = navigationController?.navigationBar else { fatalError("Navigation controller does not exist.")}
+        
+        navBar.barTintColor = UIColor(hexString: "1D9BF6")
     }
     
     //MARK: - TableView Data Source Methods
@@ -35,8 +52,18 @@ class CategoryViewController: SwipeTableViewController {
         // Bekommen eine Zelle aus der Super-Klasse durch aufrufen der tableView()-Funktion
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
             
-        //cell.textLabel?.text = categories[indexPath.row].name
-        cell.textLabel?.text = categories?[indexPath.row].name ?? "No Categories Added yet"
+        if let category = categories?[indexPath.row] {
+            cell.textLabel?.text = category.name
+            
+            guard let colour = HexColor(category.colour) else {fatalError()}
+            
+            cell.backgroundColor = colour
+            cell.textLabel?.textColor = ContrastColorOf(colour, returnFlat: true)
+            
+        } else {
+            cell.textLabel?.text = "No Categories Added yet"
+            cell.backgroundColor = HexColor("1D9BF6")
+        }
         
         return cell
     }
@@ -45,6 +72,7 @@ class CategoryViewController: SwipeTableViewController {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         performSegue(withIdentifier: "goToItems", sender: self)
+        tableView.deselectRow(at: indexPath, animated: true)
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
@@ -111,6 +139,7 @@ class CategoryViewController: SwipeTableViewController {
             let newCategory = Category()
             
             newCategory.name = textField.text!
+            newCategory.colour = UIColor.randomFlat().hexValue()
             
             // Speichern neue Category als einzelnen Datenpunkt. Beim Laden werden alle Kategorien wieder in das categories-Array geladen.
             self.save(category: newCategory)
